@@ -6,6 +6,7 @@ import type { AddressFormValues } from '../../types';
 import styles from './AddressForm.module.css';
 
 interface AddressFormProps {
+  onActiveFieldChange?: (field: keyof AddressFormValues | null) => void;
   onSubmit: (values: AddressFormValues) => void;
   onValuesChange?: (values: AddressFormValues) => void;
   onSuggestionSelect?: (field: keyof AddressFormValues, suggestion: { displayName: string; lat: number; lng: number }) => void;
@@ -54,6 +55,7 @@ function validate(values: AddressFormValues): ValidationErrors {
 }
 
 export function AddressForm({
+  onActiveFieldChange,
   onSubmit,
   onValuesChange,
   onSuggestionSelect,
@@ -177,6 +179,7 @@ export function AddressForm({
     };
 
     setActiveField(field);
+    if (onActiveFieldChange) { onActiveFieldChange(field); }
     setIsAutocompleteOpen(true);
 
     setValues(nextValues);
@@ -206,6 +209,7 @@ export function AddressForm({
       lng: suggestion.longitude,
     });
     setActiveField(field);
+    if (onActiveFieldChange) { onActiveFieldChange(field); }
     setIsAutocompleteOpen(false);
     setSuggestions([]);
     setSearchError(null);
@@ -222,6 +226,7 @@ export function AddressForm({
     onValuesChange?.(nextValues);
 
     setActiveField(targetField);
+    if (onActiveFieldChange) { onActiveFieldChange(targetField); }
     setIsAutocompleteOpen(false);
   };
 
@@ -243,6 +248,7 @@ export function AddressForm({
     }
 
     setActiveField(field);
+    if (onActiveFieldChange) { onActiveFieldChange(field); }
     setIsAutocompleteOpen(true);
   };
 

@@ -16,6 +16,7 @@ export function App() {
   const [originPoint, setOriginPoint] = useState<{ lat: number; lng: number; label: string } | null>(null);
   const [destinationPoint, setDestinationPoint] = useState<{ lat: number; lng: number; label: string } | null>(null);
   const [draftValues, setDraftValues] = useState<AddressFormValues>({ origin: '', destination: '' });
+  const [activeField, setActiveField] = useState<keyof AddressFormValues | null>(null);
   const [selectedOriginText, setSelectedOriginText] = useState<string | null>(null);
   const [selectedDestinationText, setSelectedDestinationText] = useState<string | null>(null);
   const [selectedSuggestionPoints, setSelectedSuggestionPoints] = useState<{
@@ -221,6 +222,7 @@ export function App() {
         <section className={styles.grid}>
           <div className={styles.panel}>
             <AddressForm
+              onActiveFieldChange={setActiveField}
               onSubmit={handleSubmit}
               onValuesChange={setDraftValues}
               onSuggestionSelect={(field, suggestion) => {
