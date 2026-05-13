@@ -1,6 +1,7 @@
-import type { ChangeEvent, FormEvent } from 'react';
-import { useState } from 'react';
+import type { ChangeEvent, FormEvent, KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { searchAddressSuggestions } from '../../api/geocodeApi';
 import type { AddressFormValues } from '../../types';
 import styles from './AddressForm.module.css';
 
@@ -14,10 +15,23 @@ interface ValidationErrors {
   destination?: string;
 }
 
+interface SuggestionOption {
+  id: string;
+  name: string;
+  displayName: string;
+}
+
 const INITIAL_VALUES: AddressFormValues = {
   origin: '',
   destination: '',
 };
+
+const QUICK_PICK_SUGGESTIONS: string[] = [
+  '19W, Hong Kong Science Park',
+  'Chai Wan MTR Station',
+  'Hong Kong International Airport Terminal 1',
+  'Tsim Sha Tsui Star Ferry Pier',
+];
 
 function validate(values: AddressFormValues): ValidationErrors {
   const errors: ValidationErrors = {};
@@ -36,9 +50,79 @@ function validate(values: AddressFormValues): ValidationErrors {
 export function AddressForm({ onSubmit, isSubmitting }: AddressFormProps) {
   const [values, setValues] = useState<AddressFormValues>(INITIAL_VALUES);
   const [errors, setErrors] = useState<ValidationErrors>({});
+  const [activeField, setActiveField] = useState<keyof AddressFormValues | null>(null);
+  const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<SuggestionOption[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [highlightIndex, setHighlightIndex] = useState(0);
+  const blurTimeoutRef = useRef<number | null>(null);
+
+  const activeQuery = useMemo(() => {
+    if (!activeField) {
+      return '';
+    }
+
+    return values[activeField].trim();
+  }, [activeField, values]);
+
+  useEffect(() => {
+    if (!activeField || activeQuery.length < 2 || import.meta.env.MODE === 'test') {
+      setSuggestions([]);
+      setIsSearching(false);
+      setSearchError(null);
+      setHighlightIndex(0);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setIsSearching(true);
+      setSearchError(null);
+
+      void searchAddressSuggestions(activeQuery, controller.signal)
+        .then((items) => {
+          setSuggestions(
+            items.map((item) => ({
+              id: item.id,
+              name: item.name,
+              displayName: item.displayName,
+            })),
+          );
+          setHighlightIndex(0);
+        })
+        .catch((error: unknown) => {
+          if (error instanceof DOMException && error.name === 'AbortError') {
+            return;
+          }
+
+          setSearchError('Could not load suggestions right now.');
+          setSuggestions([]);
+        })
+        .finally(() => {
+          setIsSearching(false);
+        });
+    }, 250);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [activeField, activeQuery]);
+
+  useEffect(() => {
+    return () => {
+      if (blurTimeoutRef.current !== null) {
+        window.clearTimeout(blurTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleChange = (field: keyof AddressFormValues) => (event: ChangeEvent<HTMLInputElement>) => {
     const nextValue = event.target.value;
+
+    setActiveField(field);
+    setIsAutocompleteOpen(true);
 
     setValues((current) => ({
       ...current,
@@ -55,6 +139,84 @@ export function AddressForm({ onSubmit, isSubmitting }: AddressFormProps) {
       return nextErrors;
     });
   };
+
+  const applySuggestion = (field: keyof AddressFormValues, suggestion: SuggestionOption) => {
+    setValues((current) => ({
+      ...current,
+      [field]: suggestion.displayName,
+    }));
+    setActiveField(field);
+    setIsAutocompleteOpen(false);
+    setSuggestions([]);
+    setSearchError(null);
+  };
+
+  const applyQuickPick = (text: string) => {
+    const targetField = activeField ?? (values.origin.trim() ? 'destination' : 'origin');
+
+    setValues((current) => ({
+      ...current,
+      [targetField]: text,
+    }));
+
+    setActiveField(targetField);
+    setIsAutocompleteOpen(false);
+  };
+
+  const swapRouteEnds = () => {
+    setValues((current) => ({
+      origin: current.destination,
+      destination: current.origin,
+    }));
+    setErrors({});
+    setIsAutocompleteOpen(false);
+  };
+
+  const handleFocus = (field: keyof AddressFormValues) => () => {
+    if (blurTimeoutRef.current !== null) {
+      window.clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = null;
+    }
+
+    setActiveField(field);
+    setIsAutocompleteOpen(true);
+  };
+
+  const handleBlur = () => {
+    blurTimeoutRef.current = window.setTimeout(() => {
+      setIsAutocompleteOpen(false);
+    }, 120);
+  };
+
+  const handleKeyDown = (field: keyof AddressFormValues) => (event: KeyboardEvent<HTMLInputElement>) => {
+    if (!isAutocompleteOpen || activeField !== field || suggestions.length === 0) {
+      return;
+    }
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setHighlightIndex((current) => (current + 1) % suggestions.length);
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setHighlightIndex((current) => (current - 1 + suggestions.length) % suggestions.length);
+      return;
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      applySuggestion(field, suggestions[highlightIndex]);
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      setIsAutocompleteOpen(false);
+    }
+  };
+
+  const hasDropdown = isAutocompleteOpen && activeField !== null;
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -79,43 +241,116 @@ export function AddressForm({ onSubmit, isSubmitting }: AddressFormProps) {
       <div className={styles.grid}>
         <label className={styles.field} htmlFor="origin">
           <span className={styles.label}>Origin</span>
-          <input
-            id="origin"
-            name="origin"
-            className={styles.input}
-            type="text"
-            placeholder="Pickup address"
-            value={values.origin}
-            onChange={handleChange('origin')}
-            aria-invalid={Boolean(errors.origin)}
-            aria-describedby={errors.origin ? 'origin-error' : undefined}
-            autoComplete="street-address"
-            disabled={isSubmitting}
-          />
+          <div className={styles.inputWrap}>
+            <input
+              id="origin"
+              name="origin"
+              className={styles.input}
+              type="text"
+              placeholder="Search pickup by building, mall, or station"
+              value={values.origin}
+              onChange={handleChange('origin')}
+              onFocus={handleFocus('origin')}
+              onBlur={handleBlur}
+              onKeyDown={handleKeyDown('origin')}
+              aria-invalid={Boolean(errors.origin)}
+              aria-describedby={errors.origin ? 'origin-error' : undefined}
+              autoComplete="off"
+              disabled={isSubmitting}
+            />
+            {hasDropdown && activeField === 'origin' ? (
+              <div className={styles.dropdown} role="listbox" aria-label="Origin suggestions">
+                {isSearching ? <p className={styles.dropdownHint}>Searching nearby places...</p> : null}
+                {searchError ? <p className={styles.dropdownHint}>{searchError}</p> : null}
+                {!isSearching && !searchError && suggestions.length === 0 ? (
+                  <p className={styles.dropdownHint}>Type at least 2 characters to get suggestions.</p>
+                ) : null}
+                {suggestions.map((suggestion, index) => (
+                  <button
+                    key={suggestion.id}
+                    type="button"
+                    className={styles.suggestion}
+                    data-active={index === highlightIndex}
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      applySuggestion('origin', suggestion);
+                    }}
+                  >
+                    <span className={styles.suggestionTitle}>{suggestion.name}</span>
+                    <span className={styles.suggestionSubtitle}>{suggestion.displayName}</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
           <span id="origin-error" className={styles.error} hidden={!errors.origin}>
             {errors.origin}
           </span>
         </label>
 
+        <button type="button" className={styles.swap} onClick={swapRouteEnds} disabled={isSubmitting}>
+          Swap origin and destination
+        </button>
+
         <label className={styles.field} htmlFor="destination">
           <span className={styles.label}>Destination</span>
-          <input
-            id="destination"
-            name="destination"
-            className={styles.input}
-            type="text"
-            placeholder="Drop-off address"
-            value={values.destination}
-            onChange={handleChange('destination')}
-            aria-invalid={Boolean(errors.destination)}
-            aria-describedby={errors.destination ? 'destination-error' : undefined}
-            autoComplete="off"
-            disabled={isSubmitting}
-          />
+          <div className={styles.inputWrap}>
+            <input
+              id="destination"
+              name="destination"
+              className={styles.input}
+              type="text"
+              placeholder="Search destination by landmark or street"
+              value={values.destination}
+              onChange={handleChange('destination')}
+              onFocus={handleFocus('destination')}
+              onBlur={handleBlur}
+              onKeyDown={handleKeyDown('destination')}
+              aria-invalid={Boolean(errors.destination)}
+              aria-describedby={errors.destination ? 'destination-error' : undefined}
+              autoComplete="off"
+              disabled={isSubmitting}
+            />
+            {hasDropdown && activeField === 'destination' ? (
+              <div className={styles.dropdown} role="listbox" aria-label="Destination suggestions">
+                {isSearching ? <p className={styles.dropdownHint}>Searching nearby places...</p> : null}
+                {searchError ? <p className={styles.dropdownHint}>{searchError}</p> : null}
+                {!isSearching && !searchError && suggestions.length === 0 ? (
+                  <p className={styles.dropdownHint}>Type at least 2 characters to get suggestions.</p>
+                ) : null}
+                {suggestions.map((suggestion, index) => (
+                  <button
+                    key={suggestion.id}
+                    type="button"
+                    className={styles.suggestion}
+                    data-active={index === highlightIndex}
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      applySuggestion('destination', suggestion);
+                    }}
+                  >
+                    <span className={styles.suggestionTitle}>{suggestion.name}</span>
+                    <span className={styles.suggestionSubtitle}>{suggestion.displayName}</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
           <span id="destination-error" className={styles.error} hidden={!errors.destination}>
             {errors.destination}
           </span>
         </label>
+
+        <div className={styles.quickRow}>
+          <p className={styles.quickLabel}>Quick picks</p>
+          <div className={styles.quickPills}>
+            {QUICK_PICK_SUGGESTIONS.map((item) => (
+              <button key={item} type="button" className={styles.quickPill} onClick={() => applyQuickPick(item)}>
+                {item}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <button className={styles.submit} type="submit" disabled={isSubmitting} aria-busy={isSubmitting}>
