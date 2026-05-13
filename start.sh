@@ -13,6 +13,10 @@ else
   DOCKER_COMPOSE_CMD="docker-compose"
 fi
 
+has_compose_file() {
+  [ -f "docker-compose.yml" ] || [ -f "docker-compose.yaml" ] || [ -f "compose.yml" ] || [ -f "compose.yaml" ]
+}
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -121,6 +125,12 @@ export API_PORT
 
 if [ "$DEV_MODE" = "true" ]; then
   echo -e "${BLUE}Starting dev server on port ${FRONTEND_PORT}...${NC}"
+  npm run dev -- --host 0.0.0.0 --port "$FRONTEND_PORT"
+  exit 0
+fi
+
+if ! has_compose_file; then
+  echo -e "${YELLOW}No Docker Compose file found. Falling back to the Vite dev server...${NC}"
   npm run dev -- --host 0.0.0.0 --port "$FRONTEND_PORT"
   exit 0
 fi
