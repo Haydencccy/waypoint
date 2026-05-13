@@ -1,0 +1,17 @@
+.marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.95), rgba(251, 191, 36, 0.95));
+  color: #0f172a;
+  box-shadow: 0 0.75rem 1.5rem rgba(249, 115, 22, 0.2);
+}
+
+.index {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
