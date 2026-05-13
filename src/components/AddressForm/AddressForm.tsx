@@ -301,7 +301,7 @@ export function AddressForm({ onSubmit, isSubmitting, selectedOrigin, selectedDe
                 {isSearching ? <p className={styles.dropdownHint}>Searching nearby places...</p> : null}
                 {searchError ? <p className={styles.dropdownHint}>{searchError}</p> : null}
                 {!isSearching && !searchError && suggestions.length === 0 ? (
-                  <p className={styles.dropdownHint}>Type at least 2 characters to get suggestions.</p>
+                  <p className={styles.dropdownHint}>Type to search for locations...</p>
                 ) : null}
                 {suggestions.map((suggestion, index) => (
                   <button
@@ -354,7 +354,7 @@ export function AddressForm({ onSubmit, isSubmitting, selectedOrigin, selectedDe
                 {isSearching ? <p className={styles.dropdownHint}>Searching nearby places...</p> : null}
                 {searchError ? <p className={styles.dropdownHint}>{searchError}</p> : null}
                 {!isSearching && !searchError && suggestions.length === 0 ? (
-                  <p className={styles.dropdownHint}>Type at least 2 characters to get suggestions.</p>
+                  <p className={styles.dropdownHint}>Type to search for locations...</p>
                 ) : null}
                 {suggestions.map((suggestion, index) => (
                   <button

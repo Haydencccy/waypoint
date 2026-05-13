@@ -136,7 +136,7 @@ export function App() {
             <div className={styles.spacer} />
             <ErrorBanner message={errorMessage} />
             <div className={styles.spacer} />
-            <RouteInfo route={route} isLoading={routePoll.isLoading} />
+            <RouteInfo route={route} isLoading={routePoll.isLoading} error={routePoll.error ?? submitError} />
           </div>
 
           <div className={styles.panel}>
