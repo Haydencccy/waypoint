@@ -1,6 +1,6 @@
 # Route Finder
 
-A React 18 + Vite + TypeScript app that submits a pickup and drop-off address to the Lalamove mock API, polls for the route status, and renders the returned waypoints on Google Maps.
+A React 18 + Vite + TypeScript app that submits a pickup and drop-off address to the Lalamove mock API, polls for the route status, and renders the returned waypoints on an OpenLayers base map.
 
 ## Stack
 
@@ -8,7 +8,7 @@ A React 18 + Vite + TypeScript app that submits a pickup and drop-off address to
 - Vite
 - TypeScript
 - Vitest
-- Google Maps JavaScript API
+- OpenLayers
 
 ## Getting Started
 
@@ -18,23 +18,13 @@ A React 18 + Vite + TypeScript app that submits a pickup and drop-off address to
    npm install
    ```
 
-2. Create your local environment file.
-
-   ```bash
-   cp .env.example .env
-   ```
-
-3. Add your Google Maps API key to `.env`.
-
-   ```bash
-   VITE_GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
-   ```
-
-4. Start the development server.
+2. Start the development server.
 
    ```bash
    npm run dev
    ```
+
+No map API key is required. The base map uses OpenStreetMap tiles through OpenLayers.
 
 ## Mock API
 
@@ -76,6 +66,6 @@ npm run preview
 
 ## Notes
 
-- Keep the real API key out of version control. `.env` is ignored and `.env.example` documents the required variable.
+- Keep route polling logic separate from the map implementation.
 - Polling stops on success, failure, HTTP 500, network failure, and timeout.
 - The UI keeps API calls in `src/api/`, polling logic in hooks and utilities, and presentation in components.

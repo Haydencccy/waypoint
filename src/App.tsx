@@ -13,7 +13,6 @@ export function App() {
   const [token, setToken] = useState<string | null>(null);
   const { submitRoute, isSubmitting, error: submitError } = useRouteSubmit();
   const routePoll = useRoutePoll(token);
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
   const handleSubmit = useCallback(
     (values: AddressFormValues) => {
@@ -41,14 +40,14 @@ export function App() {
           <p className={styles.kicker}>Route Finder</p>
           <h1 className={styles.title}>Submit a pickup and drop-off, then watch the route resolve in real time.</h1>
           <p className={styles.subtitle}>
-            The app posts to the mock backend, polls every 1.5 seconds, and renders the returned waypoints with a
-            Google Maps layer once the route reaches success.
+            The app posts to the mock backend, polls every 1.5 seconds, and renders the returned waypoints on an
+            OpenLayers base map once the route reaches success.
           </p>
           <div className={styles.badges} aria-label="App status highlights">
             <span className={styles.badge}>React 18</span>
             <span className={styles.badge}>Vite</span>
             <span className={styles.badge}>TypeScript</span>
-            <span className={styles.badge}>Mock API</span>
+            <span className={styles.badge}>OpenLayers</span>
           </div>
         </section>
 
@@ -62,7 +61,7 @@ export function App() {
           </div>
 
           <div className={styles.panel}>
-            <MapView waypoints={route?.path ?? []} apiKey={apiKey} />
+            <MapView waypoints={route?.path ?? []} />
           </div>
         </section>
       </main>

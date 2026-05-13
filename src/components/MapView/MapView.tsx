@@ -1,143 +1,203 @@
-import { Loader } from '@googlemaps/js-api-loader';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { waypointToLatLng, waypointsToLatLng } from '../../utils/mapHelpers';
+import Feature from 'ol/Feature';
+import Map from 'ol/Map';
+import Overlay from 'ol/Overlay';
+import View from 'ol/View';
+import { LineString, Point } from 'ol/geom';
+import TileLayer from 'ol/layer/Tile';
+import VectorLayer from 'ol/layer/Vector';
+import { defaults as defaultControls } from 'ol/control';
+import type { Coordinate } from 'ol/coordinate';
+import XYZ from 'ol/source/XYZ';
+import VectorSource from 'ol/source/Vector';
+import { fromLonLat } from 'ol/proj';
+import { Circle as CircleStyle, Fill, Stroke, Style, Text } from 'ol/style';
+import 'ol/ol.css';
+
+import { waypointsToLatLng } from '../../utils/mapHelpers';
 import type { Waypoint } from '../../types';
 import { WaypointMarker } from '../WaypointMarker/WaypointMarker';
 import styles from './MapView.module.css';
 
-interface LoaderLike {
-  load: () => Promise<unknown>;
-}
-
 interface MapViewProps {
   waypoints: Waypoint[];
-  apiKey?: string;
-  loaderFactory?: (apiKey: string) => LoaderLike;
 }
 
-type MapLoadState = 'idle' | 'loading' | 'ready' | 'error' | 'missing-key';
+type MapLoadState = 'empty' | 'ready' | 'error';
 
-function createLoader(apiKey: string): LoaderLike {
-  return new Loader({
-    apiKey,
-    version: 'weekly',
+const DEFAULT_CENTER = fromLonLat([114.1694, 22.3193]);
+const BASE_MAP_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+function createRouteStyle() {
+  return new Style({
+    stroke: new Stroke({
+      color: '#f59e0b',
+      width: 4,
+    }),
+  });
+}
+
+function waypointColor(index: number, total: number): string {
+  if (total === 1) {
+    return '#f59e0b';
+  }
+
+  if (index === 0) {
+    return '#0ea5e9';
+  }
+
+  if (index === total - 1) {
+    return '#22c55e';
+  }
+
+  return '#f97316';
+}
+
+function createWaypointStyle(index: number, total: number) {
+  const color = waypointColor(index, total);
+
+  return new Style({
+    image: new CircleStyle({
+      radius: 16,
+      stroke: new Stroke({ color: '#f8fafc', width: 2 }),
+      fill: new Fill({ color }),
+    }),
+    text: new Text({
+      text: String(index + 1),
+      font: '700 12px "IBM Plex Mono", monospace',
+      fill: new Fill({ color: '#0f172a' }),
+      stroke: new Stroke({ color: '#f8fafc', width: 1 }),
+    }),
   });
 }
 
 function getOverlayMessage(state: MapLoadState): string {
   switch (state) {
-    case 'missing-key':
-      return 'Set VITE_GOOGLE_MAPS_API_KEY to render the map.';
-    case 'loading':
-      return 'Loading Google Maps and fitting the route bounds.';
     case 'error':
-      return 'The map shell is unavailable. Route data is still shown below.';
+      return 'The OpenLayers base map could not be created. Route data is still shown below.';
+    case 'empty':
+      return 'Submit a route to render the waypoints on the OpenLayers base map.';
     default:
-      return 'Submit a route to reveal the waypoint trail.';
+      return 'Route rendered on the OpenLayers base map.';
   }
 }
 
-export function MapView({ waypoints, apiKey, loaderFactory = createLoader }: MapViewProps) {
+export function MapView({ waypoints }: MapViewProps) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const [state, setState] = useState<MapLoadState>('idle');
-  const waypointList = useMemo(() => waypointsToLatLng(waypoints), [waypoints]);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<Map | null>(null);
+  const vectorSourceRef = useRef<VectorSource | null>(null);
+  const [state, setState] = useState<MapLoadState>('empty');
+  const coordinates = useMemo<Coordinate[]>(() => {
+    return waypointsToLatLng(waypoints).map(({ lat, lng }) => fromLonLat([lng, lat]));
+  }, [waypoints]);
 
   useEffect(() => {
-    if (!mapRef.current) {
+    if (!mapRef.current || mapInstanceRef.current) {
       return;
     }
 
-    if (waypointList.length === 0) {
-      setState(apiKey ? 'idle' : 'missing-key');
-      return;
-    }
+    try {
+      const vectorSource = new VectorSource();
+      vectorSourceRef.current = vectorSource;
 
-    if (!apiKey) {
-      setState('missing-key');
-      return;
-    }
-
-    let active = true;
-    const cleanupCallbacks: Array<() => void> = [];
-
-    setState('loading');
-
-    void loaderFactory(apiKey)
-      .load()
-      .then(() => {
-        if (!active || !mapRef.current || !window.google?.maps) {
-          return;
-        }
-
-        const coordinates = waypoints.map(waypointToLatLng);
-        const map = new window.google.maps.Map(mapRef.current, {
-          center: coordinates[0],
-          zoom: 13,
-          mapTypeControl: false,
-          streetViewControl: false,
-          fullscreenControl: false,
-          clickableIcons: false,
-          gestureHandling: 'greedy',
-          styles: [
-            {
-              elementType: 'geometry',
-              stylers: [{ color: '#0f172a' }],
-            },
-            {
-              elementType: 'labels.text.fill',
-              stylers: [{ color: '#cbd5e1' }],
-            },
-            {
-              elementType: 'labels.text.stroke',
-              stylers: [{ color: '#0f172a' }],
-            },
-          ],
-        });
-
-        const bounds = new window.google.maps.LatLngBounds();
-        const markers = coordinates.map((position, index) => {
-          bounds.extend(position);
-          const marker = new window.google.maps.Marker({
-            map,
-            position,
-            label: String(index + 1),
-            title: `Waypoint ${index + 1}`,
-          });
-          cleanupCallbacks.push(() => marker.setMap(null));
-          return marker;
-        });
-
-        const polyline = new window.google.maps.Polyline({
-          map,
-          path: coordinates,
-          strokeColor: '#f59e0b',
-          strokeOpacity: 0.95,
-          strokeWeight: 4,
-          geodesic: true,
-        });
-        cleanupCallbacks.push(() => polyline.setMap(null));
-
-        if (markers.length > 1) {
-          map.fitBounds(bounds, 48);
-        } else {
-          map.setCenter(coordinates[0]);
-          map.setZoom(14);
-        }
-
-        setState('ready');
-      })
-      .catch(() => {
-        if (active) {
-          setState('error');
-        }
+      const baseLayer = new TileLayer({
+        source: new XYZ({
+          url: BASE_MAP_URL,
+          crossOrigin: 'anonymous',
+          attributions: '© OpenStreetMap contributors',
+          maxZoom: 19,
+        }),
       });
 
+      const map = new Map({
+        target: mapRef.current,
+        controls: defaultControls({ attribution: true, rotate: false, zoom: true }),
+        layers: [baseLayer, new VectorLayer({ source: vectorSource })],
+        view: new View({
+          center: DEFAULT_CENTER,
+          zoom: 12,
+          minZoom: 3,
+          maxZoom: 19,
+        }),
+      });
+
+      mapInstanceRef.current = map;
+
+      if (overlayRef.current) {
+        const overlay = new Overlay({
+          element: overlayRef.current,
+          positioning: 'bottom-center',
+          stopEvent: false,
+          offset: [0, -12],
+        });
+        map.addOverlay(overlay);
+      }
+    } catch {
+      setState('error');
+    }
+
     return () => {
-      active = false;
-      cleanupCallbacks.forEach((cleanup) => cleanup());
+      mapInstanceRef.current?.setTarget(undefined);
+      mapInstanceRef.current = null;
+      vectorSourceRef.current = null;
     };
-  }, [apiKey, loaderFactory, waypointList, waypoints]);
+  }, []);
+
+  useEffect(() => {
+    const source = vectorSourceRef.current;
+    const map = mapInstanceRef.current;
+
+    if (!source || !map) {
+      return;
+    }
+
+    source.clear();
+
+    if (coordinates.length === 0) {
+      setState('empty');
+      return;
+    }
+
+    if (coordinates.length > 1) {
+      const routeFeature = new Feature({
+        geometry: new LineString(coordinates),
+      });
+      routeFeature.setStyle(createRouteStyle());
+      source.addFeature(routeFeature);
+    }
+
+    coordinates.forEach((coordinate, index) => {
+      const waypointFeature = new Feature({
+        geometry: new Point(coordinate),
+      });
+      waypointFeature.setStyle(createWaypointStyle(index, coordinates.length));
+      source.addFeature(waypointFeature);
+    });
+
+    const view = map.getView();
+
+    if (coordinates.length === 1) {
+      view.setCenter(coordinates[0]);
+      view.setZoom(14);
+    } else {
+      const extent = source.getExtent();
+
+      if (extent) {
+        view.fit(extent, {
+          padding: [48, 48, 48, 48],
+          maxZoom: 15,
+          duration: 250,
+        });
+      } else {
+        view.setCenter(coordinates[0]);
+        view.setZoom(14);
+      }
+    }
+
+    setState('ready');
+  }, [coordinates]);
 
   return (
     <section className={styles.card} aria-label="Map view">
@@ -146,16 +206,14 @@ export function MapView({ waypoints, apiKey, loaderFactory = createLoader }: Map
           <p className={styles.eyebrow}>Map view</p>
           <h2 className={styles.title}>Waypoint trail</h2>
         </div>
-        <span className={styles.status}>{state}</span>
+        <span className={styles.status}>OpenLayers</span>
       </header>
 
       <div className={styles.canvasWrap}>
         <div ref={mapRef} className={styles.canvas} aria-hidden="true" />
-        {state !== 'ready' ? (
-          <div className={styles.overlay}>
-            <p className={styles.overlayText}>{getOverlayMessage(state)}</p>
-          </div>
-        ) : null}
+        <div ref={overlayRef} className={styles.overlay} style={{ display: state === 'ready' ? 'none' : 'flex' }}>
+          <p className={styles.overlayText}>{getOverlayMessage(state)}</p>
+        </div>
       </div>
 
       <div className={styles.list} aria-label="Waypoint list">
