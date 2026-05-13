@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  frontend:
+    image: node:18
+    container_name: route-finder-frontend
+    working_dir: /app
+    volumes:
+      - ./:/app:delegated
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - FRONTEND_PORT=3550
+    ports:
+      - "3550:3550"
+    command: sh -c "npm ci --silent && npm run dev -- --host 0.0.0.0 --port ${FRONTEND_PORT:-3550}"
+    restart: unless-stopped
