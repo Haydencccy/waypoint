@@ -1,41 +1,14 @@
-.banner {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.9rem;
-  align-items: start;
-  padding: 1rem 1.1rem;
-  border-radius: 1.1rem;
-  border: 1px solid rgba(251, 191, 36, 0.24);
-  background:
-    linear-gradient(180deg, rgba(127, 29, 29, 0.38), rgba(15, 23, 42, 0.92)),
-    rgba(15, 23, 42, 0.92);
-  box-shadow: 0 1.2rem 2.2rem rgba(2, 6, 23, 0.28);
+.error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-radius: 1rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  font-size: 0.9rem;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
-
-.accent {
-  width: 0.55rem;
-  height: 100%;
-  min-height: 3.2rem;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #f59e0b, #fb7185);
-}
-
-.content {
-  min-width: 0;
-}
-
-.label {
-  margin: 0 0 0.2rem;
-  color: rgba(253, 230, 138, 0.82);
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-
-.message {
-  margin: 0;
-  color: #fff7ed;
-  font-size: 0.95rem;
-  line-height: 1.5;
-}
+.kicker { display: none; }

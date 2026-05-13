@@ -233,6 +233,22 @@ export function App() {
                     lng: suggestion.lng,
                   },
                 }));
+                // Immediately update map without waiting for debounce
+                if (field === 'origin') {
+                  setOriginPoint({
+                    lat: suggestion.lat,
+                    lng: suggestion.lng,
+                    label: trimmedName,
+                  });
+                  setSelectedOriginText(trimmedName);
+                } else {
+                  setDestinationPoint({
+                    lat: suggestion.lat,
+                    lng: suggestion.lng,
+                    label: trimmedName,
+                  });
+                  setSelectedDestinationText(trimmedName);
+                }
               }}
               isSubmitting={isBusy}
               selectedOrigin={selectedOriginText}
