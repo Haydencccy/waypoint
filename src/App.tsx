@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { resolveAddressPoint, reverseGeocodePoint } from './api/geocodeApi';
-import { fetchRouteGeometry } from './api/routingApi';
+import { fetchRouteOptions } from './api/routingApi';
 import { AddressForm } from './components/AddressForm/AddressForm';
 import { ErrorBanner } from './components/ErrorBanner/ErrorBanner';
 import { MapView } from './components/MapView/MapView';
 import { RouteInfo } from './components/RouteInfo/RouteInfo';
 import { useRoutePoll } from './hooks/useRoutePoll';
 import { useRouteSubmit } from './hooks/useRouteSubmit';
-import type { AddressFormValues } from './types';
+import type { AddressFormValues, RouteOption } from './types';
 import styles from './App.module.css';
 
 export function App() {
@@ -18,15 +18,24 @@ export function App() {
   const [draftValues, setDraftValues] = useState<AddressFormValues>({ origin: '', destination: '' });
   const [selectedOriginText, setSelectedOriginText] = useState<string | null>(null);
   const [selectedDestinationText, setSelectedDestinationText] = useState<string | null>(null);
+  const [selectedSuggestionPoints, setSelectedSuggestionPoints] = useState<{
+    origin: { text: string; lat: number; lng: number } | null;
+    destination: { text: string; lat: number; lng: number } | null;
+  }>({
+    origin: null,
+    destination: null,
+  });
   const [nextMapPick, setNextMapPick] = useState<'origin' | 'destination'>('origin');
-  const [routeGeometry, setRouteGeometry] = useState<Array<{ lat: number; lng: number }> | null>(null);
+  const [routeOptions, setRouteOptions] = useState<RouteOption[]>([]);
+  const [selectedRouteIndex, setSelectedRouteIndex] = useState(0);
   const { submitRoute, isSubmitting, error: submitError } = useRouteSubmit();
   const routePoll = useRoutePoll(token);
 
   const handleSubmit = useCallback(
     (values: AddressFormValues) => {
       setToken(null);
-      setRouteGeometry(null);
+      setRouteOptions([]);
+      setSelectedRouteIndex(0);
       setDraftValues(values);
 
       void Promise.all([resolveAddressPoint(values.origin), resolveAddressPoint(values.destination)])
@@ -41,7 +50,8 @@ export function App() {
         .catch(() => {
           setOriginPoint(null);
           setDestinationPoint(null);
-          setRouteGeometry(null);
+          setRouteOptions([]);
+          setSelectedRouteIndex(0);
         });
 
       void submitRoute(values)
@@ -58,7 +68,8 @@ export function App() {
   const errorMessage = routePoll.error ?? submitError;
   const route = routePoll.route;
   const isBusy = isSubmitting || routePoll.isLoading;
-  const hasMapPreview = Boolean(routeGeometry && routeGeometry.length > 1);
+  const selectedRouteOption = routeOptions[selectedRouteIndex] ?? null;
+  const hasMapPreview = Boolean(selectedRouteOption && selectedRouteOption.geometry.length > 1);
   const shouldUsePreviewFallback = Boolean((routePoll.error || submitError) && hasMapPreview && !route);
   const fallbackMessage = shouldUsePreviewFallback
     ? 'Mock API could not return a final route status for this pair, but a drivable map preview is shown.'
@@ -67,21 +78,25 @@ export function App() {
 
   useEffect(() => {
     if (!originPoint || !destinationPoint) {
+      setRouteOptions([]);
+      setSelectedRouteIndex(0);
       return;
     }
 
     const controller = new AbortController();
 
-    void fetchRouteGeometry(
+    void fetchRouteOptions(
       { lat: originPoint.lat, lng: originPoint.lng },
       { lat: destinationPoint.lat, lng: destinationPoint.lng },
       controller.signal,
     )
-      .then((geometry) => {
-        setRouteGeometry(geometry);
+      .then((nextRouteOptions) => {
+        setRouteOptions(nextRouteOptions);
+        setSelectedRouteIndex(0);
       })
       .catch(() => {
-        setRouteGeometry(null);
+        setRouteOptions([]);
+        setSelectedRouteIndex(0);
       });
 
     return () => {
@@ -96,6 +111,12 @@ export function App() {
     const timer = window.setTimeout(() => {
       if (!originQuery) {
         setOriginPoint(null);
+      } else if (selectedSuggestionPoints.origin && selectedSuggestionPoints.origin.text === originQuery) {
+        setOriginPoint({
+          lat: selectedSuggestionPoints.origin.lat,
+          lng: selectedSuggestionPoints.origin.lng,
+          label: draftValues.origin,
+        });
       } else {
         void resolveAddressPoint(originQuery, controller.signal)
           .then((origin) => {
@@ -114,6 +135,12 @@ export function App() {
 
       if (!destinationQuery) {
         setDestinationPoint(null);
+      } else if (selectedSuggestionPoints.destination && selectedSuggestionPoints.destination.text === destinationQuery) {
+        setDestinationPoint({
+          lat: selectedSuggestionPoints.destination.lat,
+          lng: selectedSuggestionPoints.destination.lng,
+          label: draftValues.destination,
+        });
       } else {
         void resolveAddressPoint(destinationQuery, controller.signal)
           .then((destination) => {
@@ -135,7 +162,17 @@ export function App() {
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [draftValues]);
+  }, [draftValues, selectedSuggestionPoints.destination, selectedSuggestionPoints.origin]);
+
+  useEffect(() => {
+    const originText = draftValues.origin.trim();
+    const destinationText = draftValues.destination.trim();
+
+    setSelectedSuggestionPoints((current) => ({
+      origin: current.origin && current.origin.text === originText ? current.origin : null,
+      destination: current.destination && current.destination.text === destinationText ? current.destination : null,
+    }));
+  }, [draftValues.destination, draftValues.origin]);
 
   const handleMapClick = useCallback(
     async (point: { lat: number; lng: number; label: string }) => {
@@ -170,8 +207,8 @@ export function App() {
           <p className={styles.kicker}>Route Finder</p>
           <h1 className={styles.title}>Submit a pickup and drop-off, then watch the route resolve in real time.</h1>
           <p className={styles.subtitle}>
-            The app posts to the mock backend, polls every 1.5 seconds, and renders the returned waypoints on an
-            CSDI Lands Department map once the route reaches success.
+            The app posts to the mock backend for status polling while route lines, alternatives, and live travel
+            estimates are calculated from OSRM for map-style navigation feedback.
           </p>
           <div className={styles.badges} aria-label="App status highlights">
             <span className={styles.badge}>React 18</span>
@@ -186,6 +223,17 @@ export function App() {
             <AddressForm
               onSubmit={handleSubmit}
               onValuesChange={setDraftValues}
+              onSuggestionSelect={(field, suggestion) => {
+                const trimmedName = suggestion.displayName.trim();
+                setSelectedSuggestionPoints((current) => ({
+                  ...current,
+                  [field]: {
+                    text: trimmedName,
+                    lat: suggestion.lat,
+                    lng: suggestion.lng,
+                  },
+                }));
+              }}
               isSubmitting={isBusy}
               selectedOrigin={selectedOriginText}
               selectedDestination={selectedDestinationText}
@@ -198,6 +246,9 @@ export function App() {
               isLoading={routePoll.isLoading}
               error={uiErrorMessage}
               fallbackMessage={fallbackMessage}
+              routeOptions={routeOptions}
+              selectedRouteIndex={selectedRouteIndex}
+              onSelectRoute={setSelectedRouteIndex}
             />
           </div>
 
@@ -206,7 +257,8 @@ export function App() {
               waypoints={route?.path ?? []}
               originPoint={originPoint}
               destinationPoint={destinationPoint}
-              routeGeometry={routeGeometry}
+              routeOptions={routeOptions}
+              selectedRouteIndex={selectedRouteIndex}
               onMapClick={handleMapClick}
             />
           </div>

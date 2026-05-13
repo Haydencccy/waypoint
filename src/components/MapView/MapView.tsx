@@ -16,7 +16,7 @@ import { Circle as CircleStyle, Fill, Stroke, Style, Text } from 'ol/style';
 import 'ol/ol.css';
 
 import { waypointsToLatLng } from '../../utils/mapHelpers';
-import type { Waypoint } from '../../types';
+import type { RouteOption, Waypoint } from '../../types';
 import { WaypointMarker } from '../WaypointMarker/WaypointMarker';
 import styles from './MapView.module.css';
 
@@ -24,7 +24,8 @@ interface MapViewProps {
   waypoints: Waypoint[];
   originPoint?: { lat: number; lng: number; label: string } | null;
   destinationPoint?: { lat: number; lng: number; label: string } | null;
-  routeGeometry?: Array<{ lat: number; lng: number }> | null;
+  routeOptions?: RouteOption[];
+  selectedRouteIndex?: number;
   onMapClick?: (point: { lat: number; lng: number; label: string }) => void;
 }
 
@@ -33,11 +34,12 @@ type MapLoadState = 'empty' | 'ready' | 'error';
 const DEFAULT_CENTER = fromLonLat([114.1694, 22.3193]);
 const BASE_MAP_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
-function createRouteStyle() {
+function createRouteStyle(isPrimary: boolean) {
   return new Style({
     stroke: new Stroke({
-      color: '#f59e0b',
-      width: 4,
+      color: isPrimary ? '#4f46e5' : 'rgba(99, 102, 241, 0.55)',
+      width: isPrimary ? 6 : 4,
+      lineDash: isPrimary ? undefined : [8, 10],
     }),
   });
 }
@@ -107,7 +109,14 @@ function formatClickedPoint(lat: number, lng: number): string {
   return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
 }
 
-export function MapView({ waypoints, originPoint, destinationPoint, routeGeometry, onMapClick }: MapViewProps) {
+export function MapView({
+  waypoints,
+  originPoint,
+  destinationPoint,
+  routeOptions = [],
+  selectedRouteIndex = 0,
+  onMapClick,
+}: MapViewProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<Map | null>(null);
@@ -116,13 +125,11 @@ export function MapView({ waypoints, originPoint, destinationPoint, routeGeometr
   const coordinates = useMemo<Coordinate[]>(() => {
     return waypointsToLatLng(waypoints).map(({ lat, lng }) => fromLonLat([lng, lat]));
   }, [waypoints]);
-  const routeGeometryCoordinates = useMemo<Coordinate[]>(() => {
-    if (!routeGeometry || routeGeometry.length < 2) {
-      return [];
-    }
-
-    return routeGeometry.map(({ lat, lng }) => fromLonLat([lng, lat]));
-  }, [routeGeometry]);
+  const routeGeometryCoordinates = useMemo<Coordinate[][]>(() => {
+    return routeOptions
+      .map((option) => option.geometry.map(({ lat, lng }) => fromLonLat([lng, lat])))
+      .filter((option) => option.length > 1);
+  }, [routeOptions]);
   const originCoordinate = useMemo<Coordinate | null>(() => {
     if (!originPoint) {
       return null;
@@ -209,7 +216,8 @@ export function MapView({ waypoints, originPoint, destinationPoint, routeGeometr
 
     source.clear();
 
-    const lineCoordinates = routeGeometryCoordinates.length > 1 ? routeGeometryCoordinates : coordinates;
+    const selectedCoordinates = routeGeometryCoordinates[selectedRouteIndex] ?? routeGeometryCoordinates[0] ?? [];
+    const lineCoordinates = selectedCoordinates.length > 1 ? selectedCoordinates : coordinates;
     const fitCoordinates = [
       ...lineCoordinates,
       ...(originCoordinate ? [originCoordinate] : []),
@@ -222,10 +230,19 @@ export function MapView({ waypoints, originPoint, destinationPoint, routeGeometr
     }
 
     if (lineCoordinates.length > 1) {
+      routeGeometryCoordinates.forEach((routeOptionCoordinates, index) => {
+        const routeFeature = new Feature({
+          geometry: new LineString(routeOptionCoordinates),
+        });
+        routeFeature.setStyle(createRouteStyle(index === selectedRouteIndex));
+        source.addFeature(routeFeature);
+      });
+
+      // keep selected route on top by adding it last again
       const routeFeature = new Feature({
         geometry: new LineString(lineCoordinates),
       });
-      routeFeature.setStyle(createRouteStyle());
+      routeFeature.setStyle(createRouteStyle(true));
       source.addFeature(routeFeature);
     }
 
@@ -278,7 +295,7 @@ export function MapView({ waypoints, originPoint, destinationPoint, routeGeometr
     }
 
     setState('ready');
-  }, [coordinates, destinationCoordinate, originCoordinate, routeGeometryCoordinates]);
+  }, [coordinates, destinationCoordinate, originCoordinate, routeGeometryCoordinates, selectedRouteIndex]);
 
   const shouldShowEndpointList = Boolean(originPoint || destinationPoint);
 

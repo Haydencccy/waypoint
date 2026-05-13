@@ -8,6 +8,7 @@ import styles from './AddressForm.module.css';
 interface AddressFormProps {
   onSubmit: (values: AddressFormValues) => void;
   onValuesChange?: (values: AddressFormValues) => void;
+  onSuggestionSelect?: (field: keyof AddressFormValues, suggestion: { displayName: string; lat: number; lng: number }) => void;
   isSubmitting: boolean;
   selectedOrigin?: string | null;
   selectedDestination?: string | null;
@@ -22,6 +23,8 @@ interface SuggestionOption {
   id: string;
   name: string;
   displayName: string;
+  latitude: number;
+  longitude: number;
 }
 
 const INITIAL_VALUES: AddressFormValues = {
@@ -53,6 +56,7 @@ function validate(values: AddressFormValues): ValidationErrors {
 export function AddressForm({
   onSubmit,
   onValuesChange,
+  onSuggestionSelect,
   isSubmitting,
   selectedOrigin,
   selectedDestination,
@@ -96,6 +100,8 @@ export function AddressForm({
               id: item.id,
               name: item.name,
               displayName: item.displayName,
+              latitude: item.latitude,
+              longitude: item.longitude,
             })),
           );
           setHighlightIndex(0);
@@ -194,6 +200,11 @@ export function AddressForm({
     };
     setValues(nextValues);
     onValuesChange?.(nextValues);
+    onSuggestionSelect?.(field, {
+      displayName: suggestion.displayName,
+      lat: suggestion.latitude,
+      lng: suggestion.longitude,
+    });
     setActiveField(field);
     setIsAutocompleteOpen(false);
     setSuggestions([]);

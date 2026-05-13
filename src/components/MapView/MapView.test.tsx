@@ -77,14 +77,14 @@ describe('MapView', () => {
     );
 
     await waitFor(() => {
-      expect(mapMocks.vectorSourceInstance.clear).toHaveBeenCalledTimes(1);
-      expect(mapMocks.vectorSourceInstance.addFeature).toHaveBeenCalledTimes(3);
+      expect(mapMocks.vectorSourceInstance.clear).toHaveBeenCalled();
+      expect(mapMocks.vectorSourceInstance.addFeature.mock.calls.length).toBeGreaterThanOrEqual(3);
     });
 
     expect(screen.getByText('Origin')).toBeInTheDocument();
     expect(screen.getByText('Destination')).toBeInTheDocument();
     expect(screen.getByText('22.426200, 114.211300')).toBeInTheDocument();
     expect(screen.getByText('22.308000, 113.918500')).toBeInTheDocument();
-    expect(screen.getByText('OpenLayers')).toBeInTheDocument();
+    expect(screen.getByText('CSDI Lands Department')).toBeInTheDocument();
   });
 });

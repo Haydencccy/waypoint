@@ -28,3 +28,9 @@ export interface RouteSuccess {
 }
 
 export type RouteResponse = RouteInProgress | RouteFailure | RouteSuccess;
+
+export interface RouteOption {
+  geometry: Array<{ lat: number; lng: number }>;
+  distanceMeters: number;
+  durationSeconds: number;
+}
