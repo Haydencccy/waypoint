@@ -68,16 +68,23 @@ describe('MapView', () => {
       ['22.284419', '114.15951'],
     ];
 
-    render(<MapView waypoints={waypoints} />);
+    render(
+      <MapView
+        waypoints={waypoints}
+        originPoint={{ lat: 22.4262, lng: 114.2113, label: 'Hong Kong Science Park' }}
+        destinationPoint={{ lat: 22.308, lng: 113.9185, label: 'Hong Kong International Airport Terminal 1' }}
+      />,
+    );
 
     await waitFor(() => {
-      expect(mapMocks.mapInstance.addOverlay).toHaveBeenCalledTimes(1);
       expect(mapMocks.vectorSourceInstance.clear).toHaveBeenCalledTimes(1);
-      expect(mapMocks.vectorSourceInstance.addFeature).toHaveBeenCalledTimes(4);
+      expect(mapMocks.vectorSourceInstance.addFeature).toHaveBeenCalledTimes(3);
     });
 
-    expect(screen.getByText('Waypoint 1')).toBeInTheDocument();
-    expect(screen.getByText('22.372081, 114.107877')).toBeInTheDocument();
+    expect(screen.getByText('Origin')).toBeInTheDocument();
+    expect(screen.getByText('Destination')).toBeInTheDocument();
+    expect(screen.getByText('22.426200, 114.211300')).toBeInTheDocument();
+    expect(screen.getByText('22.308000, 113.918500')).toBeInTheDocument();
     expect(screen.getByText('OpenLayers')).toBeInTheDocument();
   });
 });

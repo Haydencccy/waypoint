@@ -8,6 +8,8 @@ import styles from './AddressForm.module.css';
 interface AddressFormProps {
   onSubmit: (values: AddressFormValues) => void;
   isSubmitting: boolean;
+  selectedOrigin?: string | null;
+  selectedDestination?: string | null;
 }
 
 interface ValidationErrors {
@@ -47,7 +49,7 @@ function validate(values: AddressFormValues): ValidationErrors {
   return errors;
 }
 
-export function AddressForm({ onSubmit, isSubmitting }: AddressFormProps) {
+export function AddressForm({ onSubmit, isSubmitting, selectedOrigin, selectedDestination }: AddressFormProps) {
   const [values, setValues] = useState<AddressFormValues>(INITIAL_VALUES);
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [activeField, setActiveField] = useState<keyof AddressFormValues | null>(null);
@@ -117,6 +119,42 @@ export function AddressForm({ onSubmit, isSubmitting }: AddressFormProps) {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof selectedOrigin === 'string') {
+      setValues((current) => ({
+        ...current,
+        origin: selectedOrigin,
+      }));
+      setErrors((current) => {
+        if (!current.origin) {
+          return current;
+        }
+
+        const nextErrors = { ...current };
+        delete nextErrors.origin;
+        return nextErrors;
+      });
+    }
+  }, [selectedOrigin]);
+
+  useEffect(() => {
+    if (typeof selectedDestination === 'string') {
+      setValues((current) => ({
+        ...current,
+        destination: selectedDestination,
+      }));
+      setErrors((current) => {
+        if (!current.destination) {
+          return current;
+        }
+
+        const nextErrors = { ...current };
+        delete nextErrors.destination;
+        return nextErrors;
+      });
+    }
+  }, [selectedDestination]);
 
   const handleChange = (field: keyof AddressFormValues) => (event: ChangeEvent<HTMLInputElement>) => {
     const nextValue = event.target.value;

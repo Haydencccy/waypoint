@@ -11,7 +11,7 @@ import { defaults as defaultControls } from 'ol/control';
 import type { Coordinate } from 'ol/coordinate';
 import XYZ from 'ol/source/XYZ';
 import VectorSource from 'ol/source/Vector';
-import { fromLonLat } from 'ol/proj';
+import { fromLonLat, toLonLat } from 'ol/proj';
 import { Circle as CircleStyle, Fill, Stroke, Style, Text } from 'ol/style';
 import 'ol/ol.css';
 
@@ -22,6 +22,10 @@ import styles from './MapView.module.css';
 
 interface MapViewProps {
   waypoints: Waypoint[];
+  originPoint?: { lat: number; lng: number; label: string } | null;
+  destinationPoint?: { lat: number; lng: number; label: string } | null;
+  routeGeometry?: Array<{ lat: number; lng: number }> | null;
+  onMapClick?: (point: { lat: number; lng: number; label: string }) => void;
 }
 
 type MapLoadState = 'empty' | 'ready' | 'error';
@@ -72,6 +76,22 @@ function createWaypointStyle(index: number, total: number) {
   });
 }
 
+function createEndpointStyle(label: string, color: string) {
+  return new Style({
+    image: new CircleStyle({
+      radius: 17,
+      stroke: new Stroke({ color: '#f8fafc', width: 2 }),
+      fill: new Fill({ color }),
+    }),
+    text: new Text({
+      text: label,
+      font: '800 12px "IBM Plex Mono", monospace',
+      fill: new Fill({ color: '#0f172a' }),
+      stroke: new Stroke({ color: '#f8fafc', width: 1 }),
+    }),
+  });
+}
+
 function getOverlayMessage(state: MapLoadState): string {
   switch (state) {
     case 'error':
@@ -83,7 +103,11 @@ function getOverlayMessage(state: MapLoadState): string {
   }
 }
 
-export function MapView({ waypoints }: MapViewProps) {
+function formatClickedPoint(lat: number, lng: number): string {
+  return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+}
+
+export function MapView({ waypoints, originPoint, destinationPoint, routeGeometry, onMapClick }: MapViewProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<Map | null>(null);
@@ -92,6 +116,27 @@ export function MapView({ waypoints }: MapViewProps) {
   const coordinates = useMemo<Coordinate[]>(() => {
     return waypointsToLatLng(waypoints).map(({ lat, lng }) => fromLonLat([lng, lat]));
   }, [waypoints]);
+  const routeGeometryCoordinates = useMemo<Coordinate[]>(() => {
+    if (!routeGeometry || routeGeometry.length < 2) {
+      return [];
+    }
+
+    return routeGeometry.map(({ lat, lng }) => fromLonLat([lng, lat]));
+  }, [routeGeometry]);
+  const originCoordinate = useMemo<Coordinate | null>(() => {
+    if (!originPoint) {
+      return null;
+    }
+
+    return fromLonLat([originPoint.lng, originPoint.lat]);
+  }, [originPoint]);
+  const destinationCoordinate = useMemo<Coordinate | null>(() => {
+    if (!destinationPoint) {
+      return null;
+    }
+
+    return fromLonLat([destinationPoint.lng, destinationPoint.lat]);
+  }, [destinationPoint]);
 
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) {
@@ -125,6 +170,15 @@ export function MapView({ waypoints }: MapViewProps) {
 
       mapInstanceRef.current = map;
 
+      map.on('singleclick', (event) => {
+        const [lng, lat] = toLonLat(event.coordinate);
+        onMapClick?.({
+          lat,
+          lng,
+          label: formatClickedPoint(lat, lng),
+        });
+      });
+
       if (overlayRef.current) {
         const overlay = new Overlay({
           element: overlayRef.current,
@@ -155,31 +209,58 @@ export function MapView({ waypoints }: MapViewProps) {
 
     source.clear();
 
-    if (coordinates.length === 0) {
+    const lineCoordinates = routeGeometryCoordinates.length > 1 ? routeGeometryCoordinates : coordinates;
+    const fitCoordinates = [
+      ...lineCoordinates,
+      ...(originCoordinate ? [originCoordinate] : []),
+      ...(destinationCoordinate ? [destinationCoordinate] : []),
+    ];
+
+    if (lineCoordinates.length === 0 && fitCoordinates.length === 0) {
       setState('empty');
       return;
     }
 
-    if (coordinates.length > 1) {
+    if (lineCoordinates.length > 1) {
       const routeFeature = new Feature({
-        geometry: new LineString(coordinates),
+        geometry: new LineString(lineCoordinates),
       });
       routeFeature.setStyle(createRouteStyle());
       source.addFeature(routeFeature);
     }
 
-    coordinates.forEach((coordinate, index) => {
-      const waypointFeature = new Feature({
-        geometry: new Point(coordinate),
+    const shouldRenderCheckpointMarkers = !originCoordinate && !destinationCoordinate;
+
+    if (shouldRenderCheckpointMarkers) {
+      coordinates.forEach((coordinate, index) => {
+        const waypointFeature = new Feature({
+          geometry: new Point(coordinate),
+        });
+        waypointFeature.setStyle(createWaypointStyle(index, coordinates.length));
+        source.addFeature(waypointFeature);
       });
-      waypointFeature.setStyle(createWaypointStyle(index, coordinates.length));
-      source.addFeature(waypointFeature);
-    });
+    }
+
+    if (originCoordinate) {
+      const originFeature = new Feature({
+        geometry: new Point(originCoordinate),
+      });
+      originFeature.setStyle(createEndpointStyle('A', '#38bdf8'));
+      source.addFeature(originFeature);
+    }
+
+    if (destinationCoordinate) {
+      const destinationFeature = new Feature({
+        geometry: new Point(destinationCoordinate),
+      });
+      destinationFeature.setStyle(createEndpointStyle('B', '#4ade80'));
+      source.addFeature(destinationFeature);
+    }
 
     const view = map.getView();
 
-    if (coordinates.length === 1) {
-      view.setCenter(coordinates[0]);
+    if (fitCoordinates.length === 1) {
+      view.setCenter(fitCoordinates[0]);
       view.setZoom(14);
     } else {
       const extent = source.getExtent();
@@ -191,13 +272,15 @@ export function MapView({ waypoints }: MapViewProps) {
           duration: 250,
         });
       } else {
-        view.setCenter(coordinates[0]);
+        view.setCenter(fitCoordinates[0]);
         view.setZoom(14);
       }
     }
 
     setState('ready');
-  }, [coordinates]);
+  }, [coordinates, destinationCoordinate, originCoordinate, routeGeometryCoordinates]);
+
+  const shouldShowEndpointList = Boolean(originPoint || destinationPoint);
 
   return (
     <section className={styles.card} aria-label="Map view">
@@ -217,7 +300,34 @@ export function MapView({ waypoints }: MapViewProps) {
       </div>
 
       <div className={styles.list} aria-label="Waypoint list">
-        {waypoints.length > 0 ? (
+        {shouldShowEndpointList ? (
+          <>
+            {originPoint ? (
+              <div className={styles.row}>
+                <span className={styles.endpointBadge}>A</span>
+                <div className={styles.rowContent}>
+                  <span className={styles.rowLabel}>Origin</span>
+                  <span className={styles.rowValue}>
+                    {originPoint.lat.toFixed(6)}, {originPoint.lng.toFixed(6)}
+                  </span>
+                  <span className={styles.rowHint}>{originPoint.label}</span>
+                </div>
+              </div>
+            ) : null}
+            {destinationPoint ? (
+              <div className={styles.row}>
+                <span className={styles.endpointBadge}>B</span>
+                <div className={styles.rowContent}>
+                  <span className={styles.rowLabel}>Destination</span>
+                  <span className={styles.rowValue}>
+                    {destinationPoint.lat.toFixed(6)}, {destinationPoint.lng.toFixed(6)}
+                  </span>
+                  <span className={styles.rowHint}>{destinationPoint.label}</span>
+                </div>
+              </div>
+            ) : null}
+          </>
+        ) : waypoints.length > 0 ? (
           waypoints.map((waypoint, index) => (
             <div key={`${waypoint[0]}-${waypoint[1]}-${index}`} className={styles.row}>
               <WaypointMarker index={index} />
