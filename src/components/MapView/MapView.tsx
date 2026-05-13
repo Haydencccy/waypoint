@@ -95,11 +95,11 @@ function createEndpointStyle(label: string, color: string) {
 function getOverlayMessage(state: MapLoadState): string {
   switch (state) {
     case 'error':
-      return 'The OpenLayers base map could not be created. Route data is still shown below.';
+      return 'The CSDI Lands Department  map could not be created. Route data is still shown below.';
     case 'empty':
-      return 'Submit a route to render the waypoints on the OpenLayers base map.';
+      return 'Submit a route to render the waypoints on the CSDI Lands Department  map.';
     default:
-      return 'Route rendered on the OpenLayers base map.';
+      return 'Route rendered on the CSDI Lands Department map.';
   }
 }
 
@@ -289,7 +289,7 @@ export function MapView({ waypoints, originPoint, destinationPoint, routeGeometr
           <p className={styles.eyebrow}>Map view</p>
           <h2 className={styles.title}>Waypoint trail</h2>
         </div>
-        <span className={styles.status}>OpenLayers</span>
+        <span className={styles.status}>CSDI Lands Department</span>
       </header>
 
       <div className={styles.canvasWrap}>

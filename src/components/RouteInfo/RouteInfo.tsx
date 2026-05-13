@@ -6,10 +6,12 @@ interface RouteInfoProps {
   route: RouteSuccess | null;
   isLoading: boolean;
   error?: string | null;
+  fallbackMessage?: string | null;
 }
 
-export function RouteInfo({ route, isLoading, error }: RouteInfoProps) {
+export function RouteInfo({ route, isLoading, error, fallbackMessage }: RouteInfoProps) {
   const hasError = Boolean(error);
+  const hasFallback = Boolean(fallbackMessage) && !route && !hasError && !isLoading;
 
   return (
     <section className={styles.card} aria-label="Route summary">
@@ -17,10 +19,20 @@ export function RouteInfo({ route, isLoading, error }: RouteInfoProps) {
         <div>
           <p className={styles.eyebrow}>Route summary</p>
           <h2 className={styles.title}>
-            {route ? 'Final path ready' : hasError ? 'Route failed' : isLoading ? 'Finding route' : 'Awaiting a route'}
+            {route
+              ? 'Final path ready'
+              : hasError
+                ? 'Route failed'
+                : hasFallback
+                  ? 'Map preview available'
+                  : isLoading
+                    ? 'Finding route'
+                    : 'Awaiting a route'}
           </h2>
         </div>
-        <span className={styles.status}>{route ? 'Success' : hasError ? 'Failed' : isLoading ? 'Polling' : 'Idle'}</span>
+        <span className={styles.status}>
+          {route ? 'Success' : hasError ? 'Failed' : hasFallback ? 'Preview' : isLoading ? 'Polling' : 'Idle'}
+        </span>
       </header>
 
       {route ? (
@@ -43,6 +55,8 @@ export function RouteInfo({ route, isLoading, error }: RouteInfoProps) {
           <p className={styles.empty}>The route request could not be completed.</p>
           <p className={styles.errorMessage}>{error}</p>
         </div>
+      ) : hasFallback ? (
+        <p className={styles.empty}>{fallbackMessage}</p>
       ) : (
         <p className={styles.empty}>
           {isLoading

@@ -7,6 +7,7 @@ import styles from './AddressForm.module.css';
 
 interface AddressFormProps {
   onSubmit: (values: AddressFormValues) => void;
+  onValuesChange?: (values: AddressFormValues) => void;
   isSubmitting: boolean;
   selectedOrigin?: string | null;
   selectedDestination?: string | null;
@@ -49,7 +50,13 @@ function validate(values: AddressFormValues): ValidationErrors {
   return errors;
 }
 
-export function AddressForm({ onSubmit, isSubmitting, selectedOrigin, selectedDestination }: AddressFormProps) {
+export function AddressForm({
+  onSubmit,
+  onValuesChange,
+  isSubmitting,
+  selectedOrigin,
+  selectedDestination,
+}: AddressFormProps) {
   const [values, setValues] = useState<AddressFormValues>(INITIAL_VALUES);
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [activeField, setActiveField] = useState<keyof AddressFormValues | null>(null);
@@ -69,7 +76,7 @@ export function AddressForm({ onSubmit, isSubmitting, selectedOrigin, selectedDe
   }, [activeField, values]);
 
   useEffect(() => {
-    if (!activeField || activeQuery.length < 2 || import.meta.env.MODE === 'test') {
+    if (!activeField || activeQuery.length < 1 || import.meta.env.MODE === 'test') {
       setSuggestions([]);
       setIsSearching(false);
       setSearchError(null);
@@ -158,14 +165,16 @@ export function AddressForm({ onSubmit, isSubmitting, selectedOrigin, selectedDe
 
   const handleChange = (field: keyof AddressFormValues) => (event: ChangeEvent<HTMLInputElement>) => {
     const nextValue = event.target.value;
+    const nextValues = {
+      ...values,
+      [field]: nextValue,
+    };
 
     setActiveField(field);
     setIsAutocompleteOpen(true);
 
-    setValues((current) => ({
-      ...current,
-      [field]: nextValue,
-    }));
+    setValues(nextValues);
+    onValuesChange?.(nextValues);
 
     setErrors((current) => {
       if (!current[field]) {
@@ -179,10 +188,12 @@ export function AddressForm({ onSubmit, isSubmitting, selectedOrigin, selectedDe
   };
 
   const applySuggestion = (field: keyof AddressFormValues, suggestion: SuggestionOption) => {
-    setValues((current) => ({
-      ...current,
+    const nextValues = {
+      ...values,
       [field]: suggestion.displayName,
-    }));
+    };
+    setValues(nextValues);
+    onValuesChange?.(nextValues);
     setActiveField(field);
     setIsAutocompleteOpen(false);
     setSuggestions([]);
@@ -191,21 +202,25 @@ export function AddressForm({ onSubmit, isSubmitting, selectedOrigin, selectedDe
 
   const applyQuickPick = (text: string) => {
     const targetField = activeField ?? (values.origin.trim() ? 'destination' : 'origin');
-
-    setValues((current) => ({
-      ...current,
+    const nextValues = {
+      ...values,
       [targetField]: text,
-    }));
+    };
+
+    setValues(nextValues);
+    onValuesChange?.(nextValues);
 
     setActiveField(targetField);
     setIsAutocompleteOpen(false);
   };
 
   const swapRouteEnds = () => {
-    setValues((current) => ({
-      origin: current.destination,
-      destination: current.origin,
-    }));
+    const nextValues = {
+      origin: values.destination,
+      destination: values.origin,
+    };
+    setValues(nextValues);
+    onValuesChange?.(nextValues);
     setErrors({});
     setIsAutocompleteOpen(false);
   };

@@ -15,6 +15,7 @@ export function App() {
   const [token, setToken] = useState<string | null>(null);
   const [originPoint, setOriginPoint] = useState<{ lat: number; lng: number; label: string } | null>(null);
   const [destinationPoint, setDestinationPoint] = useState<{ lat: number; lng: number; label: string } | null>(null);
+  const [draftValues, setDraftValues] = useState<AddressFormValues>({ origin: '', destination: '' });
   const [selectedOriginText, setSelectedOriginText] = useState<string | null>(null);
   const [selectedDestinationText, setSelectedDestinationText] = useState<string | null>(null);
   const [nextMapPick, setNextMapPick] = useState<'origin' | 'destination'>('origin');
@@ -26,15 +27,16 @@ export function App() {
     (values: AddressFormValues) => {
       setToken(null);
       setRouteGeometry(null);
+      setDraftValues(values);
 
       void Promise.all([resolveAddressPoint(values.origin), resolveAddressPoint(values.destination)])
         .then(([origin, destination]) => {
-          setOriginPoint(origin ? { lat: origin.latitude, lng: origin.longitude, label: origin.displayName } : null);
+          setOriginPoint(origin ? { lat: origin.latitude, lng: origin.longitude, label: values.origin } : null);
           setDestinationPoint(
-            destination ? { lat: destination.latitude, lng: destination.longitude, label: destination.displayName } : null,
+            destination ? { lat: destination.latitude, lng: destination.longitude, label: values.destination } : null,
           );
-          setSelectedOriginText(origin?.displayName ?? values.origin);
-          setSelectedDestinationText(destination?.displayName ?? values.destination);
+          setSelectedOriginText(values.origin);
+          setSelectedDestinationText(values.destination);
         })
         .catch(() => {
           setOriginPoint(null);
@@ -56,6 +58,12 @@ export function App() {
   const errorMessage = routePoll.error ?? submitError;
   const route = routePoll.route;
   const isBusy = isSubmitting || routePoll.isLoading;
+  const hasMapPreview = Boolean(routeGeometry && routeGeometry.length > 1);
+  const shouldUsePreviewFallback = Boolean((routePoll.error || submitError) && hasMapPreview && !route);
+  const fallbackMessage = shouldUsePreviewFallback
+    ? 'Mock API could not return a final route status for this pair, but a drivable map preview is shown.'
+    : null;
+  const uiErrorMessage = shouldUsePreviewFallback ? null : errorMessage;
 
   useEffect(() => {
     if (!originPoint || !destinationPoint) {
@@ -80,6 +88,54 @@ export function App() {
       controller.abort();
     };
   }, [destinationPoint, originPoint]);
+
+  useEffect(() => {
+    const originQuery = draftValues.origin.trim();
+    const destinationQuery = draftValues.destination.trim();
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      if (!originQuery) {
+        setOriginPoint(null);
+      } else {
+        void resolveAddressPoint(originQuery, controller.signal)
+          .then((origin) => {
+            if (!origin) {
+              return;
+            }
+
+            setOriginPoint({
+              lat: origin.latitude,
+              lng: origin.longitude,
+              label: draftValues.origin,
+            });
+          })
+          .catch(() => undefined);
+      }
+
+      if (!destinationQuery) {
+        setDestinationPoint(null);
+      } else {
+        void resolveAddressPoint(destinationQuery, controller.signal)
+          .then((destination) => {
+            if (!destination) {
+              return;
+            }
+
+            setDestinationPoint({
+              lat: destination.latitude,
+              lng: destination.longitude,
+              label: draftValues.destination,
+            });
+          })
+          .catch(() => undefined);
+      }
+    }, 300);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [draftValues]);
 
   const handleMapClick = useCallback(
     async (point: { lat: number; lng: number; label: string }) => {
@@ -115,7 +171,7 @@ export function App() {
           <h1 className={styles.title}>Submit a pickup and drop-off, then watch the route resolve in real time.</h1>
           <p className={styles.subtitle}>
             The app posts to the mock backend, polls every 1.5 seconds, and renders the returned waypoints on an
-            OpenLayers base map once the route reaches success.
+            CSDI Lands Department map once the route reaches success.
           </p>
           <div className={styles.badges} aria-label="App status highlights">
             <span className={styles.badge}>React 18</span>
@@ -129,14 +185,20 @@ export function App() {
           <div className={styles.panel}>
             <AddressForm
               onSubmit={handleSubmit}
+              onValuesChange={setDraftValues}
               isSubmitting={isBusy}
               selectedOrigin={selectedOriginText}
               selectedDestination={selectedDestinationText}
             />
             <div className={styles.spacer} />
-            <ErrorBanner message={errorMessage} />
+            <ErrorBanner message={uiErrorMessage} />
             <div className={styles.spacer} />
-            <RouteInfo route={route} isLoading={routePoll.isLoading} error={routePoll.error ?? submitError} />
+            <RouteInfo
+              route={route}
+              isLoading={routePoll.isLoading}
+              error={uiErrorMessage}
+              fallbackMessage={fallbackMessage}
+            />
           </div>
 
           <div className={styles.panel}>
