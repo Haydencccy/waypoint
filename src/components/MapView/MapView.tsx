@@ -33,6 +33,8 @@ type MapLoadState = 'empty' | 'ready' | 'error';
 
 const DEFAULT_CENTER = fromLonLat([114.1694, 22.3193]);
 const BASE_MAP_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const DISCLAIMER_URL = 'https://api.portal.hkmapservice.gov.hk/disclaimer';
+const LANDSD_LOGO_URL = 'https://api.hkmapservice.gov.hk/mapapi/landsdlogo.jpg';
 
 function createRouteStyle(isPrimary: boolean) {
   return new Style({
@@ -97,11 +99,11 @@ function createEndpointStyle(label: string, color: string) {
 function getOverlayMessage(state: MapLoadState): string {
   switch (state) {
     case 'error':
-      return 'The CSDI Lands Department  map could not be created. Route data is still shown below.';
+      return 'The map could not be created. Route data is still shown below.';
     case 'empty':
-      return 'Submit a route to render the waypoints on the CSDI Lands Department  map.';
+      return 'Submit a route to render the waypoints on the map.';
     default:
-      return 'Route rendered on the CSDI Lands Department map.';
+      return 'Route rendered on the map.';
   }
 }
 
@@ -165,13 +167,13 @@ export function MapView({
 
       const map = new Map({
         target: mapRef.current,
-        controls: defaultControls({ attribution: true, rotate: false, zoom: true }),
+        controls: defaultControls({ attribution: false, rotate: false, zoom: true }),
         layers: [baseLayer, new VectorLayer({ source: vectorSource })],
         view: new View({
           center: DEFAULT_CENTER,
-          zoom: 12,
-          minZoom: 3,
-          maxZoom: 19,
+          zoom: 11,
+          minZoom: 10,
+          maxZoom: 20,
         }),
       });
 
@@ -314,6 +316,19 @@ export function MapView({
         <div ref={overlayRef} className={styles.overlay} style={{ display: state === 'ready' ? 'none' : 'flex' }}>
           <p className={styles.overlayText}>{getOverlayMessage(state)}</p>
         </div>
+        <a
+          href={DISCLAIMER_URL}
+          target="_blank"
+          rel="noreferrer"
+          className={styles.disclaimer}
+        >
+          © Map information from Lands Department
+        </a>
+        <img
+          src={LANDSD_LOGO_URL}
+          alt="LandsD logo"
+          className={styles.logo}
+        />
       </div>
 
       <div className={styles.list} aria-label="Waypoint list">

@@ -184,6 +184,7 @@ export function App() {
 
   const handleMapClick = useCallback(
     async (point: { lat: number; lng: number; label: string }) => {
+      const target = activeField ?? nextMapPick;
       const resolvedPoint = (await reverseGeocodePoint(point.lat, point.lng)) ?? point;
       const nextPoint =
         'latitude' in resolvedPoint
@@ -194,20 +195,42 @@ export function App() {
             }
           : resolvedPoint;
 
-      const target = nextMapPick;
-
       if (target === 'origin') {
         setOriginPoint(nextPoint);
         setSelectedOriginText(nextPoint.label);
+        setSelectedSuggestionPoints((current) => ({
+          ...current,
+          origin: {
+            text: nextPoint.label,
+            lat: nextPoint.lat,
+            lng: nextPoint.lng,
+          },
+        }));
+        setDraftValues((current) => ({
+          ...current,
+          origin: nextPoint.label,
+        }));
         setNextMapPick('destination');
         return;
       }
 
       setDestinationPoint(nextPoint);
       setSelectedDestinationText(nextPoint.label);
+      setSelectedSuggestionPoints((current) => ({
+        ...current,
+        destination: {
+          text: nextPoint.label,
+          lat: nextPoint.lat,
+          lng: nextPoint.lng,
+        },
+      }));
+      setDraftValues((current) => ({
+        ...current,
+        destination: nextPoint.label,
+      }));
       setNextMapPick('origin');
     },
-    [nextMapPick],
+    [activeField, nextMapPick],
   );
 
   return (
