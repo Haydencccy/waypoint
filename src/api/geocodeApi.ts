@@ -13,17 +13,6 @@ export interface ResolvedAddressPoint {
   displayName: string;
 }
 
-interface NominatimResult {
-  place_id: number;
-  name?: string;
-  display_name: string;
-  lat: string;
-  lon: string;
-}
-
-const NOMINATIM_SEARCH_URL = 'https://nominatim.openstreetmap.org/search';
-const NOMINATIM_REVERSE_URL = 'https://nominatim.openstreetmap.org/reverse';
-
 interface KnownPlace {
   id: string;
   aliases: string[];
@@ -35,24 +24,55 @@ interface KnownPlace {
 const KNOWN_PLACES: KnownPlace[] = [
   {
     id: 'hkia-t1',
-    aliases: ['hong kong international airport terminal 1', 'hk airport terminal 1', 'hkg terminal 1'],
-    displayName: 'Hong Kong International Airport Terminal 1, Chek Lap Kok, Hong Kong',
+    aliases: [
+      'hong kong international airport',
+      'hong kong international airport terminal 1',
+      'hk airport terminal 1',
+      'hkg terminal 1',
+      'airport',
+      'hkia',
+      'terminal 1',
+      '香港國際機場',
+      '機場',
+    ],
+    displayName: 'Hong Kong International Airport',
     latitude: 22.308,
     longitude: 113.9185,
   },
   {
     id: 'hk-science-park',
-    aliases: ['hong kong science park', 'science park', 'hk science park', '19w'],
-    displayName: 'Hong Kong Science Park, Pak Shek Kok, New Territories, Hong Kong',
+    aliases: ['hong kong science park', 'science park', 'hk science park', '19w', '香港科學園', '科學園', '白石角', '雲滙'],
+    displayName: '19W, Hong Kong Science Park',
     latitude: 22.4262,
     longitude: 114.2113,
   },
   {
     id: 'chai-wan-mtr',
-    aliases: ['chai wan mtr station', 'chai wan station', 'chai wan'],
-    displayName: 'Chai Wan MTR Station, Chai Wan, Hong Kong',
+    aliases: ['chai wan mtr station', 'chai wan station', 'chai wan', '柴灣站', '港鐵柴灣站', '柴灣'],
+    displayName: 'Chai Wan MTR Station',
     latitude: 22.2646,
     longitude: 114.2379,
+  },
+  {
+    id: 'tsim-sha-tsui-ferry',
+    aliases: ['tsim sha tsui star ferry pier', 'star ferry pier', 'tsim sha tsui ferry', '天星碼頭', '尖沙咀天星碼頭'],
+    displayName: 'Tsim Sha Tsui Star Ferry Pier',
+    latitude: 22.2938,
+    longitude: 114.1686,
+  },
+  {
+    id: 'science-park-hkust',
+    aliases: ['hong kong science park phase 1', 'science park phase 1'],
+    displayName: 'Hong Kong Science Park',
+    latitude: 22.4262,
+    longitude: 114.2113,
+  },
+  {
+    id: 'science-park-19w',
+    aliases: ['19w hong kong science park', '19w science park'],
+    displayName: '19W, Hong Kong Science Park',
+    latitude: 22.4262,
+    longitude: 114.2113,
   },
 ];
 
@@ -80,17 +100,30 @@ function resolveKnownPlace(query: string): AddressSuggestion | null {
   };
 }
 
-function buildSearchUrl(query: string): string {
-  const params = new URLSearchParams({
-    q: query,
-    format: 'jsonv2',
-    addressdetails: '1',
-    viewbox: '113.79,22.57,114.51,22.15',
-    bounded: '0',
-    limit: '6',
-  });
+function buildLooseMatches(query: string): AddressSuggestion[] {
+  const normalized = normalizeQuery(query);
+  if (!normalized) {
+    return [];
+  }
 
-  return `${NOMINATIM_SEARCH_URL}?${params.toString()}`;
+  const uniqueById = new Set<string>();
+
+  return KNOWN_PLACES.filter((place) => place.aliases.some((alias) => normalized.includes(alias)))
+    .map((place) => ({
+      id: place.id,
+      name: place.displayName.split(',')[0],
+      displayName: place.displayName,
+      latitude: place.latitude,
+      longitude: place.longitude,
+    }))
+    .filter((item) => {
+      if (uniqueById.has(item.id)) {
+        return false;
+      }
+
+      uniqueById.add(item.id);
+      return true;
+    });
 }
 
 export async function searchAddressSuggestions(query: string, signal?: AbortSignal): Promise<AddressSuggestion[]> {
@@ -99,58 +132,17 @@ export async function searchAddressSuggestions(query: string, signal?: AbortSign
     return [];
   }
 
+  void signal;
+
   const knownPlace = resolveKnownPlace(trimmed);
+  const looseMatches = buildLooseMatches(trimmed);
 
-  const response = await fetch(buildSearchUrl(trimmed), {
-    method: 'GET',
-    signal,
-    headers: {
-      Accept: 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error('Unable to fetch address suggestions');
+  if (knownPlace) {
+    const filteredMatches = looseMatches.filter((item) => item.id !== knownPlace.id);
+    return [knownPlace, ...filteredMatches].slice(0, 6);
   }
 
-  const payload = (await response.json()) as NominatimResult[];
-  if (!Array.isArray(payload)) {
-    return [];
-  }
-
-  const uniqueByDisplayName = new Set<string>();
-
-  const suggestions = payload
-    .map((item) => ({
-      id: String(item.place_id),
-      name: item.name || item.display_name.split(',')[0] || item.display_name,
-      displayName: item.display_name,
-      latitude: Number.parseFloat(item.lat),
-      longitude: Number.parseFloat(item.lon),
-    }))
-    .filter((item) => {
-      if (!Number.isFinite(item.latitude) || !Number.isFinite(item.longitude)) {
-        return false;
-      }
-
-      const dedupeKey = item.displayName.toLowerCase();
-      if (uniqueByDisplayName.has(dedupeKey)) {
-        return false;
-      }
-
-      uniqueByDisplayName.add(dedupeKey);
-      return true;
-    });
-
-  if (!knownPlace) {
-    return suggestions;
-  }
-
-  const withoutDuplicateKnownPlace = suggestions.filter(
-    (item) => item.displayName.toLowerCase() !== knownPlace.displayName.toLowerCase(),
-  );
-
-  return [knownPlace, ...withoutDuplicateKnownPlace].slice(0, 6);
+  return looseMatches.slice(0, 6);
 }
 
 export async function resolveAddressPoint(query: string, signal?: AbortSignal): Promise<ResolvedAddressPoint | null> {
@@ -188,33 +180,32 @@ export async function reverseGeocodePoint(
   longitude: number,
   signal?: AbortSignal,
 ): Promise<ResolvedAddressPoint | null> {
-  const params = new URLSearchParams({
-    lat: String(latitude),
-    lon: String(longitude),
-    format: 'jsonv2',
-  });
+  void signal;
 
-  const response = await fetch(`${NOMINATIM_REVERSE_URL}?${params.toString()}`, {
-    method: 'GET',
-    signal,
-    headers: {
-      Accept: 'application/json',
-    },
-  });
+  const nearestPlace = KNOWN_PLACES.reduce<KnownPlace | null>((closest, current) => {
+    if (!closest) {
+      return current;
+    }
 
-  if (!response.ok) {
-    return null;
-  }
+    const currentDistance = Math.hypot(current.latitude - latitude, current.longitude - longitude);
+    const closestDistance = Math.hypot(closest.latitude - latitude, closest.longitude - longitude);
 
-  const payload = (await response.json()) as { display_name?: string; lat?: string; lon?: string };
-  if (!payload.display_name || typeof payload.lat !== 'string' || typeof payload.lon !== 'string') {
-    return null;
+    return currentDistance < closestDistance ? current : closest;
+  }, null);
+
+  if (nearestPlace && Math.hypot(nearestPlace.latitude - latitude, nearestPlace.longitude - longitude) <= 0.05) {
+    return {
+      query: nearestPlace.displayName,
+      latitude: nearestPlace.latitude,
+      longitude: nearestPlace.longitude,
+      displayName: nearestPlace.displayName,
+    };
   }
 
   return {
-    query: payload.display_name,
-    latitude: Number.parseFloat(payload.lat),
-    longitude: Number.parseFloat(payload.lon),
-    displayName: payload.display_name,
+    query: `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
+    latitude,
+    longitude,
+    displayName: `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
   };
 }
