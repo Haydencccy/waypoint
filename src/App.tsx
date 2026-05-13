@@ -175,6 +175,13 @@ export function App() {
     }));
   }, [draftValues.destination, draftValues.origin]);
 
+  const handleActiveFieldChange = useCallback((field: keyof AddressFormValues | null) => {
+    setActiveField(field);
+    if (field) {
+      setNextMapPick(field);
+    }
+  }, []);
+
   const handleMapClick = useCallback(
     async (point: { lat: number; lng: number; label: string }) => {
       const resolvedPoint = (await reverseGeocodePoint(point.lat, point.lng)) ?? point;
@@ -187,7 +194,9 @@ export function App() {
             }
           : resolvedPoint;
 
-      if (nextMapPick === 'origin') {
+      const target = nextMapPick;
+
+      if (target === 'origin') {
         setOriginPoint(nextPoint);
         setSelectedOriginText(nextPoint.label);
         setNextMapPick('destination');
@@ -222,7 +231,7 @@ export function App() {
         <section className={styles.grid}>
           <div className={styles.panel}>
             <AddressForm
-              onActiveFieldChange={setActiveField}
+              onActiveFieldChange={handleActiveFieldChange}
               onSubmit={handleSubmit}
               onValuesChange={setDraftValues}
               onSuggestionSelect={(field, suggestion) => {

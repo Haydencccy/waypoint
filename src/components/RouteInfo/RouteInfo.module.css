@@ -83,3 +83,53 @@
 .eyebrow {
   display: none;
 }
+
+.alternatives {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid #dbe4f0;
+  background: #f8fafc;
+  color: #0f172a;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.option:hover {
+  background: #eef4ff;
+  transform: translateY(-1px);
+}
+
+.option[data-active='true'] {
+  background: #eaf2ff;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.12);
+}
+
+.optionTitle {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.optionMeta {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.empty {
+  margin: 0;
+  color: #334155;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}

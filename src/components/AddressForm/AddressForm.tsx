@@ -328,6 +328,21 @@ export function AddressForm({
               autoComplete="off"
               disabled={isSubmitting}
             />
+            <button
+              type="button"
+              className={styles.swapIcon}
+              onMouseDown={(event) => {
+                event.preventDefault();
+              }}
+              onClick={swapRouteEnds}
+              disabled={isSubmitting}
+              aria-label="Swap origin and destination"
+              title="Swap origin and destination"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 7h11m0 0-3-3m3 3-3 3M17 17H6m0 0 3-3m-3 3 3 3" />
+              </svg>
+            </button>
             {hasDropdown && activeField === 'origin' ? (
               <div className={styles.dropdown} role="listbox" aria-label="Origin suggestions">
                 {isSearching ? <p className={styles.dropdownHint}>Searching nearby places...</p> : null}
@@ -357,10 +372,6 @@ export function AddressForm({
             {errors.origin}
           </span>
         </label>
-
-        <button type="button" className={styles.swap} onClick={swapRouteEnds} disabled={isSubmitting}>
-          Swap origin and destination
-        </button>
 
         <label className={styles.field} htmlFor="destination">
           <span className={styles.label}>Destination</span>
@@ -411,16 +422,6 @@ export function AddressForm({
           </span>
         </label>
 
-        <div className={styles.quickRow}>
-          <p className={styles.quickLabel}>Quick picks</p>
-          <div className={styles.quickPills}>
-            {QUICK_PICK_SUGGESTIONS.map((item) => (
-              <button key={item} type="button" className={styles.quickPill} onClick={() => applyQuickPick(item)}>
-                {item}
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
 
       <button className={styles.submit} type="submit" disabled={isSubmitting} aria-busy={isSubmitting}>
