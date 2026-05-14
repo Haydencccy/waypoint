@@ -2,9 +2,6 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 
 import { resolveAddressPoint, reverseGeocodePoint } from './api/geocodeApi';
 import { fetchRouteOptions } from './api/routingApi';
-import { AddressForm } from './components/AddressForm/AddressForm';
-import { ErrorBanner } from './components/ErrorBanner/ErrorBanner';
-import { RouteInfo } from './components/RouteInfo/RouteInfo';
 import { useRoutePoll } from './hooks/useRoutePoll';
 import { useRouteSubmit } from './hooks/useRouteSubmit';
 import type { AddressFormValues, RouteOption } from './types';
@@ -13,6 +10,21 @@ import styles from './App.module.css';
 const MapView = lazy(async () => {
   const module = await import('./components/MapView/MapView');
   return { default: module.MapView };
+});
+
+const AddressForm = lazy(async () => {
+  const module = await import('./components/AddressForm/AddressForm');
+  return { default: module.AddressForm };
+});
+
+const ErrorBanner = lazy(async () => {
+  const module = await import('./components/ErrorBanner/ErrorBanner');
+  return { default: module.ErrorBanner };
+});
+
+const RouteInfo = lazy(async () => {
+  const module = await import('./components/RouteInfo/RouteInfo');
+  return { default: module.RouteInfo };
 });
 
 export function App() {
@@ -82,6 +94,16 @@ export function App() {
     ? 'Mock API could not return a final route status for this pair, but a drivable map preview is shown.'
     : null;
   const uiErrorMessage = shouldUsePreviewFallback ? null : errorMessage;
+
+  const loadingScreen = (
+    <div className={styles.appLoading} role="status" aria-live="polite" aria-busy="true">
+      <div className={styles.appLoadingCard}>
+        <div className={styles.appLoadingPulse} />
+        <p className={styles.appLoadingTitle}>Loading Route Finder</p>
+        <p className={styles.appLoadingText}>Preparing the map and controls…</p>
+      </div>
+    </div>
+  );
 
   useEffect(() => {
     if (!originPoint || !destinationPoint) {
@@ -245,87 +267,89 @@ export function App() {
 
   return (
     <div className={styles.page}>
-      <main className={styles.shell}>
-        <section className={styles.hero}>
-          <p className={styles.kicker}>Route Finder</p>
-          <h1 className={styles.title}>Submit a pickup and drop-off, then watch the route resolve in real time.</h1>
-          <p className={styles.subtitle}>
-            The app posts to the mock backend for status polling while route lines, alternatives, and live travel
-            estimates are calculated from OSRM for map-style navigation feedback.
-          </p>
-          <div className={styles.badges} aria-label="App status highlights">
-            <span className={styles.badge}>React 18</span>
-            <span className={styles.badge}>Vite</span>
-            <span className={styles.badge}>TypeScript</span>
-            <span className={styles.badge}>OpenLayers</span>
-          </div>
-        </section>
+      <Suspense fallback={loadingScreen}>
+        <main className={styles.shell}>
+          <section className={styles.hero}>
+            <p className={styles.kicker}>Route Finder</p>
+            <h1 className={styles.title}>Submit a pickup and drop-off, then watch the route resolve in real time.</h1>
+            <p className={styles.subtitle}>
+              The app posts to the mock backend for status polling while route lines, alternatives, and live travel
+              estimates are calculated from OSRM for map-style navigation feedback.
+            </p>
+            <div className={styles.badges} aria-label="App status highlights">
+              <span className={styles.badge}>React 18</span>
+              <span className={styles.badge}>Vite</span>
+              <span className={styles.badge}>TypeScript</span>
+              <span className={styles.badge}>OpenLayers</span>
+            </div>
+          </section>
 
-        <section className={styles.grid}>
-          <div className={styles.panel}>
-            <AddressForm
-              onActiveFieldChange={handleActiveFieldChange}
-              onSubmit={handleSubmit}
-              onValuesChange={setDraftValues}
-              onSuggestionSelect={(field, suggestion) => {
-                const trimmedName = suggestion.displayName.trim();
-                setSelectedSuggestionPoints((current) => ({
-                  ...current,
-                  [field]: {
-                    text: trimmedName,
-                    lat: suggestion.lat,
-                    lng: suggestion.lng,
-                  },
-                }));
-                // Immediately update map without waiting for debounce
-                if (field === 'origin') {
-                  setOriginPoint({
-                    lat: suggestion.lat,
-                    lng: suggestion.lng,
-                    label: trimmedName,
-                  });
-                  setSelectedOriginText(trimmedName);
-                } else {
-                  setDestinationPoint({
-                    lat: suggestion.lat,
-                    lng: suggestion.lng,
-                    label: trimmedName,
-                  });
-                  setSelectedDestinationText(trimmedName);
-                }
-              }}
-              isSubmitting={isBusy}
-              selectedOrigin={selectedOriginText}
-              selectedDestination={selectedDestinationText}
-            />
-            <div className={styles.spacer} />
-            <ErrorBanner message={uiErrorMessage} />
-            <div className={styles.spacer} />
-            <RouteInfo
-              route={route}
-              isLoading={routePoll.isLoading}
-              error={uiErrorMessage}
-              fallbackMessage={fallbackMessage}
-              routeOptions={routeOptions}
-              selectedRouteIndex={selectedRouteIndex}
-              onSelectRoute={setSelectedRouteIndex}
-            />
-          </div>
-
-          <div className={styles.panel}>
-            <Suspense fallback={<div className={styles.mapLoading}>Loading map…</div>}>
-              <MapView
-                waypoints={route?.path ?? []}
-                originPoint={originPoint}
-                destinationPoint={destinationPoint}
+          <section className={styles.grid}>
+            <div className={styles.panel}>
+              <AddressForm
+                onActiveFieldChange={handleActiveFieldChange}
+                onSubmit={handleSubmit}
+                onValuesChange={setDraftValues}
+                onSuggestionSelect={(field, suggestion) => {
+                  const trimmedName = suggestion.displayName.trim();
+                  setSelectedSuggestionPoints((current) => ({
+                    ...current,
+                    [field]: {
+                      text: trimmedName,
+                      lat: suggestion.lat,
+                      lng: suggestion.lng,
+                    },
+                  }));
+                  // Immediately update map without waiting for debounce
+                  if (field === 'origin') {
+                    setOriginPoint({
+                      lat: suggestion.lat,
+                      lng: suggestion.lng,
+                      label: trimmedName,
+                    });
+                    setSelectedOriginText(trimmedName);
+                  } else {
+                    setDestinationPoint({
+                      lat: suggestion.lat,
+                      lng: suggestion.lng,
+                      label: trimmedName,
+                    });
+                    setSelectedDestinationText(trimmedName);
+                  }
+                }}
+                isSubmitting={isBusy}
+                selectedOrigin={selectedOriginText}
+                selectedDestination={selectedDestinationText}
+              />
+              <div className={styles.spacer} />
+              <ErrorBanner message={uiErrorMessage} />
+              <div className={styles.spacer} />
+              <RouteInfo
+                route={route}
+                isLoading={routePoll.isLoading}
+                error={uiErrorMessage}
+                fallbackMessage={fallbackMessage}
                 routeOptions={routeOptions}
                 selectedRouteIndex={selectedRouteIndex}
-                onMapClick={handleMapClick}
+                onSelectRoute={setSelectedRouteIndex}
               />
-            </Suspense>
-          </div>
-        </section>
-      </main>
+            </div>
+
+            <div className={styles.panel}>
+              <Suspense fallback={<div className={styles.mapLoading}>Loading map…</div>}>
+                <MapView
+                  waypoints={route?.path ?? []}
+                  originPoint={originPoint}
+                  destinationPoint={destinationPoint}
+                  routeOptions={routeOptions}
+                  selectedRouteIndex={selectedRouteIndex}
+                  onMapClick={handleMapClick}
+                />
+              </Suspense>
+            </div>
+          </section>
+        </main>
+      </Suspense>
     </div>
   );
 }
