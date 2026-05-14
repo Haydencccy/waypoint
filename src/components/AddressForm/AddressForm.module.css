@@ -1,4 +1,3 @@
-
 .form {
   background: white;
   border-radius: 1rem;
@@ -225,4 +224,49 @@
 .quickPill:hover {
   background: #e2e8f0;
   color: #0f172a;
+}
+
+@media (max-width: 640px) {
+  .form {
+    padding: 1rem;
+    gap: 0.8rem;
+    border-radius: 1.2rem;
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.10);
+  }
+
+  .grid {
+    gap: 0.6rem;
+  }
+
+  .label {
+    font-size: 0.82rem;
+  }
+
+  .input {
+    padding: 0.55rem 2.75rem 0.55rem 0.7rem;
+    font-size: 0.9rem;
+  }
+
+  .swapIcon {
+    width: 1.85rem;
+    height: 1.85rem;
+  }
+
+  .submit {
+    padding: 0.68rem;
+    font-size: 0.9rem;
+  }
+
+  .dropdown {
+    margin-top: 0.35rem;
+  }
+
+  .quickLabel {
+    font-size: 0.8rem;
+  }
+
+  .quickPill {
+    padding: 0.3rem 0.65rem;
+    font-size: 0.7rem;
+  }
 }

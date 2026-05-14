@@ -98,8 +98,22 @@
 }
 
 @media (max-width: 640px) {
+  .card {
+    width: 100%;
+    height: 100%;
+    min-height: 30rem;
+    border-radius: 1.35rem;
+    box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
+    overflow: hidden;
+    background: #cfe5f1;
+  }
+
   .canvasWrap {
-    min-height: 100vh;
+    width: 100%;
+    height: calc(100% - 0.25rem);
+    min-height: 30rem;
+    border-radius: inherit;
+    overflow: hidden;
   }
 
   .disclaimer {
@@ -119,10 +133,10 @@
 
 /* Reposition Default OpenLayers Zoom Controls */
 :global(.ol-zoom) {
-  top: auto !important;
+  top: 0.75rem !important;
+  right: 0.75rem !important;
   left: auto !important;
-  bottom: 2rem !important;
-  right: 1rem !important;
+  bottom: auto !important;
 }
 
 :global(.ol-zoom button) {
@@ -140,6 +154,14 @@
 
 @media (max-width: 768px) {
   :global(.ol-zoom) {
-    bottom: 250px !important; /* Move above the mobile address form */
+    top: 0.5rem !important;
+    right: 0.5rem !important;
+    bottom: auto !important;
+  }
+
+  :global(.ol-zoom button) {
+    width: 1.85rem !important;
+    height: 1.85rem !important;
+    font-size: 1.05rem !important;
   }
 }

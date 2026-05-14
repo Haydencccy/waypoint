@@ -1,15 +1,19 @@
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 
 import { resolveAddressPoint, reverseGeocodePoint } from './api/geocodeApi';
 import { fetchRouteOptions } from './api/routingApi';
 import { AddressForm } from './components/AddressForm/AddressForm';
 import { ErrorBanner } from './components/ErrorBanner/ErrorBanner';
-import { MapView } from './components/MapView/MapView';
 import { RouteInfo } from './components/RouteInfo/RouteInfo';
 import { useRoutePoll } from './hooks/useRoutePoll';
 import { useRouteSubmit } from './hooks/useRouteSubmit';
 import type { AddressFormValues, RouteOption } from './types';
 import styles from './App.module.css';
+
+const MapView = lazy(async () => {
+  const module = await import('./components/MapView/MapView');
+  return { default: module.MapView };
+});
 
 export function App() {
   const [token, setToken] = useState<string | null>(null);
@@ -17,6 +21,7 @@ export function App() {
   const [destinationPoint, setDestinationPoint] = useState<{ lat: number; lng: number; label: string } | null>(null);
   const [draftValues, setDraftValues] = useState<AddressFormValues>({ origin: '', destination: '' });
   const [activeField, setActiveField] = useState<keyof AddressFormValues | null>(null);
+  const activeFieldRef = useRef<keyof AddressFormValues | null>(null);
   const [selectedOriginText, setSelectedOriginText] = useState<string | null>(null);
   const [selectedDestinationText, setSelectedDestinationText] = useState<string | null>(null);
   const [selectedSuggestionPoints, setSelectedSuggestionPoints] = useState<{
@@ -27,6 +32,7 @@ export function App() {
     destination: null,
   });
   const [nextMapPick, setNextMapPick] = useState<'origin' | 'destination'>('origin');
+  const nextMapPickRef = useRef<'origin' | 'destination'>('origin');
   const [routeOptions, setRouteOptions] = useState<RouteOption[]>([]);
   const [selectedRouteIndex, setSelectedRouteIndex] = useState(0);
   const { submitRoute, isSubmitting, error: submitError } = useRouteSubmit();
@@ -176,15 +182,17 @@ export function App() {
   }, [draftValues.destination, draftValues.origin]);
 
   const handleActiveFieldChange = useCallback((field: keyof AddressFormValues | null) => {
+    activeFieldRef.current = field;
     setActiveField(field);
     if (field) {
+      nextMapPickRef.current = field;
       setNextMapPick(field);
     }
   }, []);
 
   const handleMapClick = useCallback(
     async (point: { lat: number; lng: number; label: string }) => {
-      const target = activeField ?? nextMapPick;
+      const target = activeFieldRef.current ?? nextMapPickRef.current;
       const resolvedPoint = (await reverseGeocodePoint(point.lat, point.lng)) ?? point;
       const nextPoint =
         'latitude' in resolvedPoint
@@ -210,6 +218,7 @@ export function App() {
           ...current,
           origin: nextPoint.label,
         }));
+        nextMapPickRef.current = 'destination';
         setNextMapPick('destination');
         return;
       }
@@ -228,9 +237,10 @@ export function App() {
         ...current,
         destination: nextPoint.label,
       }));
+      nextMapPickRef.current = 'origin';
       setNextMapPick('origin');
     },
-    [activeField, nextMapPick],
+    [],
   );
 
   return (
@@ -303,14 +313,16 @@ export function App() {
           </div>
 
           <div className={styles.panel}>
-            <MapView
-              waypoints={route?.path ?? []}
-              originPoint={originPoint}
-              destinationPoint={destinationPoint}
-              routeOptions={routeOptions}
-              selectedRouteIndex={selectedRouteIndex}
-              onMapClick={handleMapClick}
-            />
+            <Suspense fallback={<div className={styles.mapLoading}>Loading map…</div>}>
+              <MapView
+                waypoints={route?.path ?? []}
+                originPoint={originPoint}
+                destinationPoint={destinationPoint}
+                routeOptions={routeOptions}
+                selectedRouteIndex={selectedRouteIndex}
+                onMapClick={handleMapClick}
+              />
+            </Suspense>
           </div>
         </section>
       </main>
