@@ -9,5 +9,11 @@ export default defineConfig({
     port: 3550,
     // allow the tunneled hostname(s) - replace or add more as needed
     allowedHosts: ['hophk.ai-rwa.xyz'],
+    // HMR config for HTTPS + FRP tunnel (fixes Chrome "mixed content" warning)
+    hmr: {
+      host: 'hophk.ai-rwa.xyz',
+      port: 443,
+      protocol: 'wss', // WebSocket Secure for HTTPS environments
+    },
   },
 })
