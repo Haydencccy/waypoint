@@ -1,6 +1,6 @@
 # Route Finder
 
-A React 18 + Vite + TypeScript app that submits a pickup and drop-off address to the Lalamove mock API, polls for the route status, and renders the returned waypoints on an OpenLayers base map.
+A React 18 + Vite + TypeScript app that submits a pickup and drop-off address to the mock API, polls for the route status, and renders the returned waypoints on an OpenLayers base map.
 
 ## Stack
 
@@ -28,7 +28,7 @@ No map API key is required. The base map uses OpenStreetMap tiles through OpenLa
 
 ## Mock API
 
-The app talks to `https://sg-mock-api.lalamove.com`.
+The app talks to `https://sg-mock-api..com`.
 
 - `POST /route` submits a pickup and drop-off
 - `GET /route/:token` polls for `in progress`, `failure`, or `success`
